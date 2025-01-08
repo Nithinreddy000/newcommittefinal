@@ -90,11 +90,25 @@ class _LoginScreenState extends State<LoginScreen> {
                     },
                   ),
                   if (_errorMessage != null)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 16),
-                      child: Text(
-                        _errorMessage!,
-                        style: const TextStyle(color: Colors.red),
+                    Container(
+                      margin: const EdgeInsets.only(top: 16),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.red.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.red.withOpacity(0.3)),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.error_outline, color: Colors.red[700], size: 20),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              _errorMessage!,
+                              style: TextStyle(color: Colors.red[700]),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   const SizedBox(height: 24),
@@ -137,17 +151,20 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _handleLogin() async {
-    setState(() => _errorMessage = null);
-    
     if (_formKey.currentState!.validate()) {
+      setState(() {
+        _errorMessage = null;
+      });
+
       try {
-        await context.read<AuthService>().login(
-          _emailController.text,
+        final authService = context.read<AuthService>();
+        await authService.login(
+          _emailController.text.trim(),
           _passwordController.text,
         );
 
         if (mounted) {
-          final user = context.read<AuthService>().currentUser;
+          final user = authService.currentUser;
           if (user != null) {
             Navigator.of(context).pushAndRemoveUntil(
               MaterialPageRoute(
@@ -158,7 +175,11 @@ class _LoginScreenState extends State<LoginScreen> {
           }
         }
       } catch (e) {
-        setState(() => _errorMessage = e.toString());
+        setState(() {
+          _errorMessage = e.toString();
+        });
+        // Clear password field on error
+        _passwordController.clear();
       }
     }
   }

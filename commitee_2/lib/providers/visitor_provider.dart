@@ -13,11 +13,57 @@ class VisitorProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  void updateVisitor(Visitor updatedVisitor) {
+    final index = _visitors.indexWhere((v) => v.id == updatedVisitor.id);
+    if (index != -1) {
+      _visitors[index] = updatedVisitor;
+      notifyListeners();
+    }
+  }
+
+  void updateVisitorDetails(String visitorId, {
+    String? name,
+    String? purpose,
+    String? contactNumber,
+    String? vehicleNumber,
+  }) {
+    final index = _visitors.indexWhere((v) => v.id == visitorId);
+    if (index != -1) {
+      _visitors[index] = _visitors[index].copyWith(
+        name: name,
+        purpose: purpose,
+        contactNumber: contactNumber,
+        vehicleNumber: vehicleNumber,
+      );
+      notifyListeners();
+    }
+  }
+
+  void deleteVisitor(String visitorId) {
+    _visitors.removeWhere((v) => v.id == visitorId);
+    notifyListeners();
+  }
+
   void recordExit(String visitorId) {
     final index = _visitors.indexWhere((v) => v.id == visitorId);
     if (index != -1) {
-      _visitors[index].exitTime = DateTime.now();
-      _visitors[index].isInside = false;
+      _visitors[index] = _visitors[index].copyWith(
+        exitTime: DateTime.now(),
+        isInside: false,
+      );
+      notifyListeners();
+    }
+  }
+
+  void markVisitorExit(String visitorId) {
+    final index = _visitors.indexWhere((v) => v.id == visitorId);
+    if (index != -1) {
+      final visitor = _visitors[index];
+      _visitors[index] = visitor.copyWith(
+        exitTime: DateTime.now(),
+        status: 'completed',
+        isInside: false,
+      );
       notifyListeners();
     }
   }
@@ -25,7 +71,7 @@ class VisitorProvider extends ChangeNotifier {
   void approveVisitor(String id) {
     final index = _visitors.indexWhere((visitor) => visitor.id == id);
     if (index != -1) {
-      _visitors[index].status = 'approved';
+      _visitors[index] = _visitors[index].copyWith(status: 'approved');
       notifyListeners();
     }
   }
@@ -33,7 +79,7 @@ class VisitorProvider extends ChangeNotifier {
   void rejectVisitor(String id) {
     final index = _visitors.indexWhere((visitor) => visitor.id == id);
     if (index != -1) {
-      _visitors[index].status = 'rejected';
+      _visitors[index] = _visitors[index].copyWith(status: 'rejected');
       notifyListeners();
     }
   }
@@ -49,4 +95,4 @@ class VisitorProvider extends ChangeNotifier {
   List<Visitor> getPastVisitorsByFlat(String flatNumber) {
     return completedVisits.where((v) => v.flatNumber == flatNumber).toList();
   }
-} 
+}

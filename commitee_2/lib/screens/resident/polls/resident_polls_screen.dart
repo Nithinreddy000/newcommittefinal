@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../../providers/poll_provider.dart';
 import '../../../models/poll.dart';
 import '../../../services/auth_service.dart';
+import '../../../models/user.dart';
 
 class ResidentPollsScreen extends StatelessWidget {
   const ResidentPollsScreen({super.key});
@@ -77,6 +78,22 @@ class ResidentPollsScreen extends StatelessWidget {
                     ),
                   ],
                 ),
+                trailing: poll.createdBy == userId
+                    ? Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.edit),
+                            onPressed: () => _showEditPollDialog(context, poll),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.delete),
+                            color: Colors.red,
+                            onPressed: () => _showDeletePollDialog(context, poll.id),
+                          ),
+                        ],
+                      )
+                    : null,
                 isThreeLine: true,
               ),
               if (hasVoted || !isActive) ...[
@@ -171,17 +188,140 @@ class ResidentPollsScreen extends StatelessWidget {
             child: const Text('Cancel'),
           ),
           ElevatedButton(
+            onPressed: () async {
+              try {
+                final user = context.read<AuthService>().currentUser!;
+                await context.read<PollProvider>().vote(pollId, optionId, user);
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Vote cast successfully'),
+                    backgroundColor: Colors.green,
+                  ),
+                );
+              } catch (e) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Failed to cast vote: ${e.toString()}'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              }
+            },
+            child: const Text('Confirm'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showEditPollDialog(BuildContext context, Poll poll) {
+    final formKey = GlobalKey<FormState>();
+    final titleController = TextEditingController(text: poll.title);
+    final descriptionController = TextEditingController(text: poll.description);
+    final optionsControllers = poll.options.map((option) => TextEditingController(text: option.text)).toList();
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Edit Poll'),
+        content: Form(
+          key: formKey,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextFormField(
+                  controller: titleController,
+                  decoration: const InputDecoration(
+                    labelText: 'Title*',
+                    border: OutlineInputBorder(),
+                  ),
+                  validator: (value) => value?.isEmpty ?? true ? 'Title is required' : null,
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: descriptionController,
+                  decoration: const InputDecoration(
+                    labelText: 'Description*',
+                    border: OutlineInputBorder(),
+                  ),
+                  maxLines: 3,
+                  validator: (value) => value?.isEmpty ?? true ? 'Description is required' : null,
+                ),
+                const SizedBox(height: 16),
+                ...optionsControllers.map((controller) => Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: TextFormField(
+                        controller: controller,
+                        decoration: const InputDecoration(
+                          labelText: 'Option',
+                          border: OutlineInputBorder(),
+                        ),
+                        validator: (value) => value?.isEmpty ?? true ? 'Option cannot be empty' : null,
+                      ),
+                    )),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              if (formKey.currentState?.validate() ?? false) {
+                await context.read<PollProvider>().editPoll(
+                  poll.id,
+                  title: titleController.text.trim(),
+                  description: descriptionController.text.trim(),
+                  options: optionsControllers
+                      .map((c) => c.text.trim())
+                      .where((text) => text.isNotEmpty)
+                      .toList(),
+                );
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Poll updated successfully')),
+                );
+              }
+            },
+            child: const Text('Update'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showDeletePollDialog(BuildContext context, String pollId) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Poll'),
+        content: const Text('Are you sure you want to delete this poll? This action cannot be undone.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
             onPressed: () {
-              context.read<PollProvider>().vote(pollId, optionId, userId);
+              context.read<PollProvider>().deletePoll(pollId);
               Navigator.pop(context);
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
-                  content: Text('Vote cast successfully'),
-                  backgroundColor: Colors.green,
+                  content: Text('Poll deleted successfully'),
+                  backgroundColor: Colors.red,
                 ),
               );
             },
-            child: const Text('Confirm'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Delete'),
           ),
         ],
       ),
@@ -191,4 +331,4 @@ class ResidentPollsScreen extends StatelessWidget {
   String _formatDate(DateTime date) {
     return '${date.day}/${date.month}/${date.year}';
   }
-} 
+}

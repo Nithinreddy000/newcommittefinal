@@ -12,8 +12,16 @@ class DefaultFirebaseOptions {
         return android;
       case TargetPlatform.iOS:
         return ios;
+      case TargetPlatform.windows:
+        return windows;
+      case TargetPlatform.macOS:
+        return windows;
+      case TargetPlatform.linux:
+        return windows;
       default:
-        throw UnsupportedError('Unsupported platform');
+        throw UnsupportedError(
+          'DefaultFirebaseOptions are not supported for this platform.',
+        );
     }
   }
 
@@ -25,6 +33,15 @@ class DefaultFirebaseOptions {
     authDomain: 'commitee-app.firebaseapp.com',
     storageBucket: 'commitee-app.appspot.com',
     measurementId: 'G-3TSC478GQJ',
+  );
+
+  static const FirebaseOptions windows = FirebaseOptions(
+    apiKey: 'AIzaSyBAopioxqBbDbD3FmvZAB7Har-AL3AE7QA',
+    appId: '1:138509251676:web:a6c86e873580b0d590a299',
+    messagingSenderId: '138509251676',
+    projectId: 'commitee-app',
+    authDomain: 'commitee-app.firebaseapp.com',
+    storageBucket: 'commitee-app.appspot.com',
   );
 
   static const FirebaseOptions android = FirebaseOptions(
@@ -44,4 +61,4 @@ class DefaultFirebaseOptions {
     iosClientId: 'committe123',
     iosBundleId: 'committe123',
   );
-} 
+}

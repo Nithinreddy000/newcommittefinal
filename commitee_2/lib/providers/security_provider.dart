@@ -19,7 +19,13 @@ class SecurityProvider extends ChangeNotifier {
 
   void requestAssistance(String staffId) {
     // Logic to send an alert to the nearest available security staff
+    // This could involve sending a notification or updating a database
     notifyListeners();
+  }
+
+  @override
+  String toString() {
+    return 'SecurityProvider(activeStaff: $activeStaff)';
   }
 
   // Other methods...

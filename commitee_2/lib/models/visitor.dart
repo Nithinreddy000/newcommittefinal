@@ -24,4 +24,29 @@ class Visitor {
     this.isInside = true,
     this.status = 'pending',
   });
-} 
+
+  Visitor copyWith({
+    String? name,
+    String? purpose,
+    String? contactNumber,
+    String? vehicleNumber,
+    String? flatNumber,
+    DateTime? exitTime,
+    bool? isInside,
+    String? status,
+  }) {
+    return Visitor(
+      id: this.id,
+      name: name ?? this.name,
+      purpose: purpose ?? this.purpose,
+      flatNumber: flatNumber ?? this.flatNumber,
+      entryTime: this.entryTime,
+      exitTime: exitTime ?? this.exitTime,
+      contactNumber: contactNumber ?? this.contactNumber,
+      vehicleNumber: vehicleNumber ?? this.vehicleNumber,
+      approvedBy: this.approvedBy,
+      isInside: isInside ?? this.isInside,
+      status: status ?? this.status,
+    );
+  }
+}

@@ -8,4 +8,16 @@ class PollResponse {
     required this.userName,
     required this.response,
   });
-} 
+
+  PollResponse copyWith({
+    String? userId,
+    String? userName,
+    String? response,
+  }) {
+    return PollResponse(
+      userId: userId ?? this.userId,
+      userName: userName ?? this.userName,
+      response: response ?? this.response,
+    );
+  }
+}

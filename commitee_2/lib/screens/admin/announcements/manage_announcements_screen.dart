@@ -1,131 +1,110 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../../providers/announcement_provider.dart';
 import '../../../models/announcement.dart';
+import '../../../providers/announcement_provider.dart';
+import '../../../services/auth_service.dart';
 
 class ManageAnnouncementsScreen extends StatelessWidget {
   const ManageAnnouncementsScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return DefaultTabController(
-      length: 2,
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('Manage Announcements'),
-          bottom: const TabBar(
-            tabs: [
-              Tab(text: 'View All'),
-              Tab(text: 'Create New'),
-            ],
-          ),
-        ),
-        body: TabBarView(
-          children: [
-            _buildAnnouncementsList(),
-            _buildAddAnnouncementForm(),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildAnnouncementsList() {
     return Consumer<AnnouncementProvider>(
-      builder: (context, provider, child) {
-        if (provider.announcements.isEmpty) {
-          return const Center(
-            child: Text('No announcements yet'),
-          );
-        }
-
-        return ListView.builder(
-          itemCount: provider.announcements.length,
-          itemBuilder: (context, index) {
-            final announcement = provider.announcements[index];
-            return Card(
-              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: ListTile(
-                leading: _getPriorityIcon(announcement.priority),
-                title: Text(announcement.title),
-                subtitle: Text(announcement.content),
-                trailing: IconButton(
-                  icon: const Icon(Icons.delete),
-                  onPressed: () => provider.removeAnnouncement(announcement.id),
-                ),
+      builder: (context, provider, _) {
+        final announcements = provider.announcements;
+        
+        return Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: ElevatedButton(
+                onPressed: () => _showAnnouncementDialog(context),
+                child: const Text('Create New Announcement'),
               ),
-            );
-          },
+            ),
+            Expanded(
+              child: ListView.builder(
+                itemCount: announcements.length,
+                itemBuilder: (context, index) {
+                  final announcement = announcements[index];
+                  return Card(
+                    margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    child: ListTile(
+                      title: Text(announcement.title),
+                      subtitle: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(announcement.content),
+                          Text(
+                            'Posted on: ${_formatDateTime(announcement.timestamp)}',
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                        ],
+                      ),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.edit),
+                            onPressed: () => _showAnnouncementDialog(
+                              context,
+                              announcement: announcement,
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.delete),
+                            onPressed: () => _showDeleteDialog(context, announcement),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
         );
       },
     );
   }
 
-  Widget _buildAddAnnouncementForm() {
-    final titleController = TextEditingController();
-    final contentController = TextEditingController();
-    AnnouncementPriority selectedPriority = AnnouncementPriority.normal;
-    final visibleTo = {'resident': true, 'security': true, 'admin': true};
+  void _showAnnouncementDialog(BuildContext context, {Announcement? announcement}) {
+    final titleController = TextEditingController(text: announcement?.title ?? '');
+    final contentController = TextEditingController(text: announcement?.content ?? '');
+    final formKey = GlobalKey<FormState>();
 
-    return StatefulBuilder(
-      builder: (context, setState) => AlertDialog(
-        title: const Text('New Announcement'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: titleController,
-                decoration: const InputDecoration(
-                  labelText: 'Title',
-                  border: OutlineInputBorder(),
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(announcement == null ? 'Create Announcement' : 'Edit Announcement'),
+        content: Form(
+          key: formKey,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextFormField(
+                  controller: titleController,
+                  decoration: const InputDecoration(
+                    labelText: 'Title',
+                    border: OutlineInputBorder(),
+                  ),
+                  validator: (value) =>
+                      value?.isEmpty ?? true ? 'Title is required' : null,
                 ),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: contentController,
-                decoration: const InputDecoration(
-                  labelText: 'Content',
-                  border: OutlineInputBorder(),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: contentController,
+                  decoration: const InputDecoration(
+                    labelText: 'Content',
+                    border: OutlineInputBorder(),
+                  ),
+                  maxLines: 5,
+                  validator: (value) =>
+                      value?.isEmpty ?? true ? 'Content is required' : null,
                 ),
-                maxLines: 3,
-              ),
-              const SizedBox(height: 16),
-              DropdownButtonFormField<AnnouncementPriority>(
-                value: selectedPriority,
-                decoration: const InputDecoration(
-                  labelText: 'Priority',
-                  border: OutlineInputBorder(),
-                ),
-                items: AnnouncementPriority.values.map((priority) {
-                  return DropdownMenuItem(
-                    value: priority,
-                    child: Text(priority.name.toUpperCase()),
-                  );
-                }).toList(),
-                onChanged: (value) {
-                  if (value != null) {
-                    setState(() => selectedPriority = value);
-                  }
-                },
-              ),
-              const SizedBox(height: 16),
-              const Text('Visible to:'),
-              CheckboxListTile(
-                title: const Text('Residents'),
-                value: visibleTo['resident'],
-                onChanged: (value) {
-                  setState(() => visibleTo['resident'] = value!);
-                },
-              ),
-              CheckboxListTile(
-                title: const Text('Security'),
-                value: visibleTo['security'],
-                onChanged: (value) {
-                  setState(() => visibleTo['security'] = value!);
-                },
-              ),
-            ],
+              ],
+            ),
           ),
         ),
         actions: [
@@ -135,58 +114,79 @@ class ManageAnnouncementsScreen extends StatelessWidget {
           ),
           ElevatedButton(
             onPressed: () {
-              if (titleController.text.isNotEmpty && 
-                  contentController.text.isNotEmpty) {
-                final announcement = Announcement(
-                  id: DateTime.now().millisecondsSinceEpoch.toString(),
-                  title: titleController.text,
-                  content: contentController.text,
-                  datePosted: DateTime.now(),
-                  postedBy: 'Admin',
-                  priority: selectedPriority,
-                  visibleTo: visibleTo.entries
-                      .where((e) => e.value)
-                      .map((e) => e.key)
-                      .toList(),
-                );
-
-                context.read<AnnouncementProvider>().addAnnouncement(announcement);
+              if (formKey.currentState?.validate() ?? false) {
+                final currentUser = context.read<AuthService>().currentUser!;
+                
+                if (announcement == null) {
+                  // Create new announcement
+                  final newAnnouncement = Announcement(
+                    id: DateTime.now().millisecondsSinceEpoch.toString(),
+                    title: titleController.text,
+                    content: contentController.text,
+                    timestamp: DateTime.now(),
+                    userId: currentUser.id,
+                    userName: currentUser.name,
+                  );
+                  context.read<AnnouncementProvider>().addAnnouncement(newAnnouncement);
+                } else {
+                  // Update existing announcement
+                  final updatedAnnouncement = announcement.copyWith(
+                    title: titleController.text,
+                    content: contentController.text,
+                    timestamp: DateTime.now(),
+                  );
+                  context.read<AnnouncementProvider>().updateAnnouncement(updatedAnnouncement);
+                }
+                
                 Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      announcement == null
+                          ? 'Announcement created successfully'
+                          : 'Announcement updated successfully',
+                    ),
+                  ),
+                );
               }
             },
-            child: const Text('Post'),
+            child: Text(announcement == null ? 'Create' : 'Update'),
           ),
         ],
       ),
     );
   }
 
-  Widget _getPriorityIcon(AnnouncementPriority priority) {
-    IconData iconData;
-    Color color;
-
-    switch (priority) {
-      case AnnouncementPriority.urgent:
-        iconData = Icons.warning;
-        color = Colors.red;
-        break;
-      case AnnouncementPriority.high:
-        iconData = Icons.priority_high;
-        color = Colors.orange;
-        break;
-      case AnnouncementPriority.normal:
-        iconData = Icons.info;
-        color = Colors.blue;
-        break;
-      case AnnouncementPriority.low:
-        iconData = Icons.info_outline;
-        color = Colors.grey;
-        break;
-    }
-
-    return CircleAvatar(
-      backgroundColor: color.withOpacity(0.2),
-      child: Icon(iconData, color: color),
+  void _showDeleteDialog(BuildContext context, Announcement announcement) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Announcement'),
+        content: Text('Are you sure you want to delete "${announcement.title}"?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              context.read<AnnouncementProvider>().removeAnnouncement(announcement.id);
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Announcement deleted successfully')),
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+            ),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
     );
   }
-} 
+
+  String _formatDateTime(DateTime dateTime) {
+    return '${dateTime.month}/${dateTime.day}/${dateTime.year} ${dateTime.hour}:${dateTime.minute}';
+  }
+}

@@ -35,23 +35,22 @@
       emailjs.init("yVELO5r4qfTguTJqX");
     })();
 
-    window.sendEmail = function(serviceId, templateId, templateParams) {
+    // Global function to send emails
+    function sendEmail(serviceId, templateId, templateParams) {
       console.log('Sending email with parameters:', templateParams);
       
-      return new Promise((resolve, reject) => {
-        emailjs.send(serviceId, templateId, templateParams)
-          .then(function(response) {
-            console.log('Email sent successfully to:', templateParams.to_email);
-            console.log('Full response:', response);
-            resolve(true);
-          })
-          .catch(function(error) {
-            console.error('Failed to send email to:', templateParams.to_email);
-            console.error('Error details:', error);
-            resolve(false);
-          });
-      });
-    };
+      return emailjs.send(serviceId, templateId, templateParams)
+        .then(function(response) {
+          console.log('Email sent successfully to:', templateParams.to_email);
+          console.log('Full response:', response);
+          return true;
+        })
+        .catch(function(error) {
+          console.error('Failed to send email to:', templateParams.to_email);
+          console.error('Error details:', error);
+          return false;
+        });
+    }
   </script>
 
   <!-- Favicon -->

@@ -20,36 +20,78 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> with FormValida
       child: Column(
         children: [
           ElevatedButton(
-            onPressed: () => _showAddAnnouncementDialog(context),
+            onPressed: () => _showAnnouncementDialog(context),
             child: const Text('Add New Announcement'),
           ),
           const SizedBox(height: 16),
           Expanded(
             child: Consumer<AnnouncementProvider>(
               builder: (context, provider, child) {
+                if (provider.announcements.isEmpty) {
+                  return const Center(
+                    child: Text('No announcements yet'),
+                  );
+                }
+
                 return ListView.builder(
                   itemCount: provider.announcements.length,
                   itemBuilder: (context, index) {
                     final announcement = provider.announcements[index];
                     return Card(
-                      child: ListTile(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      child: ExpansionTile(
                         leading: _getPriorityIcon(announcement.priority),
                         title: Text(announcement.title),
-                        subtitle: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(announcement.content),
-                            const SizedBox(height: 4),
-                            Text(
-                              'Posted by ${announcement.postedBy} on ${announcement.datePosted.toString().split(' ')[0]}',
-                              style: Theme.of(context).textTheme.bodySmall,
+                        subtitle: Text(
+                          'Posted by ${announcement.postedBy} on ${_formatDate(announcement.datePosted)}',
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.all(16.0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(announcement.content),
+                                const SizedBox(height: 8),
+                                Text(
+                                  'Visible to: ${announcement.visibleTo.map((e) => e.toUpperCase()).join(', ')}',
+                                  style: Theme.of(context).textTheme.bodySmall,
+                                ),
+                                if (announcement.lastUpdated != null) ...[
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    'Last updated: ${_formatDate(announcement.lastUpdated!)}',
+                                    style: Theme.of(context).textTheme.bodySmall,
+                                  ),
+                                ],
+                                const SizedBox(height: 16),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.end,
+                                  children: [
+                                    TextButton.icon(
+                                      icon: const Icon(Icons.edit),
+                                      label: const Text('Edit'),
+                                      onPressed: () => _showAnnouncementDialog(
+                                        context,
+                                        announcement: announcement,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    TextButton.icon(
+                                      icon: const Icon(Icons.delete),
+                                      label: const Text('Delete'),
+                                      onPressed: () => _showDeleteDialog(context, announcement),
+                                      style: TextButton.styleFrom(
+                                        foregroundColor: Colors.red,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
                             ),
-                          ],
-                        ),
-                        trailing: IconButton(
-                          icon: const Icon(Icons.delete),
-                          onPressed: () => provider.removeAnnouncement(announcement.id),
-                        ),
+                          ),
+                        ],
                       ),
                     );
                   },
@@ -62,13 +104,15 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> with FormValida
     );
   }
 
-  void _showAddAnnouncementDialog(BuildContext context) {
+  void _showAnnouncementDialog(BuildContext context, {Announcement? announcement}) {
     final formKey = GlobalKey<FormState>();
-    final titleController = TextEditingController();
-    final contentController = TextEditingController();
-    AnnouncementPriority selectedPriority = AnnouncementPriority.normal;
+    final titleController = TextEditingController(text: announcement?.title ?? '');
+    final contentController = TextEditingController(text: announcement?.content ?? '');
+    AnnouncementPriority selectedPriority = announcement?.priority ?? AnnouncementPriority.normal;
     final visibilityOptions = <String>['resident', 'security', 'admin'];
-    final selectedVisibility = <String>[...visibilityOptions];
+    final selectedVisibility = <String>[
+      ...announcement?.visibleTo ?? visibilityOptions,
+    ];
 
     showDialog(
       context: context,
@@ -76,7 +120,7 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> with FormValida
         return StatefulBuilder(
           builder: (context, setState) {
             return AlertDialog(
-              title: const Text('Add New Announcement'),
+              title: Text(announcement == null ? 'Add New Announcement' : 'Edit Announcement'),
               content: Form(
                 key: formKey,
                 child: SingleChildScrollView(
@@ -112,7 +156,7 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> with FormValida
                         items: AnnouncementPriority.values.map((priority) => 
                           DropdownMenuItem(
                             value: priority,
-                            child: Text(priority.toString().split('.').last),
+                            child: Text(priority.toString().split('.').last.toUpperCase()),
                           ),
                         ).toList(),
                         onChanged: (value) {
@@ -134,7 +178,15 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> with FormValida
                               if (value!) {
                                 selectedVisibility.add(option);
                               } else {
-                                selectedVisibility.remove(option);
+                                if (selectedVisibility.length > 1) {
+                                  selectedVisibility.remove(option);
+                                } else {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('At least one visibility option must be selected'),
+                                    ),
+                                  );
+                                }
                               }
                             });
                           },
@@ -153,20 +205,44 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> with FormValida
                   onPressed: () {
                     if (formKey.currentState?.validate() ?? false) {
                       final currentUser = context.read<AuthService>().currentUser;
-                      context.read<AnnouncementProvider>().addAnnouncement(
-                        title: titleController.text.trim(),
-                        content: contentController.text.trim(),
-                        postedBy: currentUser?.name ?? 'Admin',
-                        priority: selectedPriority,
-                        visibleTo: selectedVisibility,
-                      );
+                      
+                      if (announcement == null) {
+                        // Create new announcement
+                        context.read<AnnouncementProvider>().addAnnouncement(
+                          title: titleController.text.trim(),
+                          content: contentController.text.trim(),
+                          postedBy: currentUser?.name ?? 'Admin',
+                          priority: selectedPriority,
+                          visibleTo: selectedVisibility,
+                        );
+                      } else {
+                        // Update existing announcement
+                        final updatedAnnouncement = Announcement(
+                          id: announcement.id,
+                          title: titleController.text.trim(),
+                          content: contentController.text.trim(),
+                          datePosted: announcement.datePosted,
+                          postedBy: announcement.postedBy,
+                          priority: selectedPriority,
+                          visibleTo: selectedVisibility,
+                          lastUpdated: DateTime.now(),
+                        );
+                        context.read<AnnouncementProvider>().updateAnnouncement(updatedAnnouncement);
+                      }
+
                       Navigator.pop(context);
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Announcement added successfully')),
+                        SnackBar(
+                          content: Text(
+                            announcement == null
+                                ? 'Announcement added successfully'
+                                : 'Announcement updated successfully',
+                          ),
+                        ),
                       );
                     }
                   },
-                  child: const Text('Add'),
+                  child: Text(announcement == null ? 'Add' : 'Update'),
                 ),
               ],
             );
@@ -174,6 +250,39 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> with FormValida
         );
       },
     );
+  }
+
+  void _showDeleteDialog(BuildContext context, Announcement announcement) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Announcement'),
+        content: Text('Are you sure you want to delete "${announcement.title}"?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              context.read<AnnouncementProvider>().removeAnnouncement(announcement.id);
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Announcement deleted successfully')),
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+            ),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatDate(DateTime date) {
+    return '${date.month}/${date.day}/${date.year}';
   }
 
   Widget _getPriorityIcon(AnnouncementPriority priority) {
@@ -199,6 +308,9 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> with FormValida
         break;
     }
 
-    return Icon(iconData, color: color);
+    return CircleAvatar(
+      backgroundColor: color.withOpacity(0.2),
+      child: Icon(iconData, color: color),
+    );
   }
-} 
+}

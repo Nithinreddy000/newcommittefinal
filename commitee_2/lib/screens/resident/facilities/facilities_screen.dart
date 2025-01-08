@@ -1,13 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../../models/facility.dart';
+import '../../../models/facility_booking.dart';
 import '../../../providers/facility_provider.dart';
-import '../../../models/facility_booking_new.dart';
 import '../../../services/auth_service.dart';
 import 'facility_booking_screen.dart';
 
-class FacilitiesScreen extends StatelessWidget {
+class FacilitiesScreen extends StatefulWidget {
   const FacilitiesScreen({super.key});
 
+  @override
+  State<FacilitiesScreen> createState() => _FacilitiesScreenState();
+}
+
+class _FacilitiesScreenState extends State<FacilitiesScreen> {
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
@@ -24,40 +30,93 @@ class FacilitiesScreen extends StatelessWidget {
         ),
         body: TabBarView(
           children: [
-            _buildFacilitiesList(context),
-            _buildBookingsList(context),
+            _buildAvailableFacilities(context),
+            _buildMyBookings(context),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildFacilitiesList(BuildContext context) {
+  Widget _buildAvailableFacilities(BuildContext context) {
     return Consumer<FacilityProvider>(
       builder: (context, provider, child) {
+        if (provider.facilities.isEmpty) {
+          return const Center(
+            child: Text('No facilities available'),
+          );
+        }
+
         return ListView.builder(
           padding: const EdgeInsets.all(16),
           itemCount: provider.facilities.length,
           itemBuilder: (context, index) {
             final facility = provider.facilities[index];
             return Card(
-              child: ListTile(
-                leading: CircleAvatar(
-                  child: Icon(_getFacilityIcon(facility['icon'])),
-                ),
-                title: Text(facility['name']),
-                subtitle: Text(facility['description']),
-                trailing: ElevatedButton(
-                  onPressed: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => FacilityBookingScreen(
-                        facility: facility,
+              margin: const EdgeInsets.only(bottom: 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  AspectRatio(
+                    aspectRatio: 16 / 9,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).primaryColor.withOpacity(0.1),
+                      ),
+                      child: Center(
+                        child: Icon(
+                          Icons.business,
+                          size: 48,
+                          color: Theme.of(context).primaryColor,
+                        ),
                       ),
                     ),
                   ),
-                  child: const Text('Book'),
-                ),
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          facility.name,
+                          style: Theme.of(context).textTheme.titleLarge,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          facility.description,
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Available time slots will be shown when booking',
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                        const SizedBox(height: 16),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            _buildDetailChip(
+                              Icons.access_time,
+                              'Check Availability',
+                            ),
+                            ElevatedButton.icon(
+                              onPressed: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => FacilityBookingScreen(
+                                    facility: facility,
+                                  ),
+                                ),
+                              ),
+                              icon: const Icon(Icons.calendar_today),
+                              label: const Text('Book Now'),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             );
           },
@@ -66,13 +125,17 @@ class FacilitiesScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildBookingsList(BuildContext context) {
+  Widget _buildMyBookings(BuildContext context) {
     return Consumer<FacilityProvider>(
       builder: (context, provider, child) {
-        final userId = Provider.of<AuthService>(context, listen: false).currentUser!.id;
-        final bookings = provider.getBookingsByUser(userId);
-
-        if (bookings.isEmpty) {
+        final user = Provider.of<AuthService>(context, listen: false).currentUser;
+        if (user == null) {
+          return const Center(child: Text('Please log in to view your bookings'));
+        }
+        
+        final userBookings = provider.getUserBookings(user.id);
+        
+        if (userBookings.isEmpty) {
           return const Center(
             child: Text('No bookings found'),
           );
@@ -80,24 +143,44 @@ class FacilitiesScreen extends StatelessWidget {
 
         return ListView.builder(
           padding: const EdgeInsets.all(16),
-          itemCount: bookings.length,
+          itemCount: userBookings.length,
           itemBuilder: (context, index) {
-            final booking = bookings[index];
+            final booking = userBookings[index];
+            final facility = provider.getFacility(booking.facilityId);
+            
+            if (facility == null) return const SizedBox.shrink();
+
             return Card(
+              elevation: 2,
+              margin: const EdgeInsets.only(bottom: 16),
               child: ListTile(
-                title: Text(booking.facilityName),
+                leading: CircleAvatar(
+                  child: Icon(Icons.business),
+                ),
+                title: Text(facility.name),
                 subtitle: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Date: ${_formatDate(booking.bookingDate)}'),
-                    Text('Time: ${_getSlotText(booking.timeSlot)}'),
-                    Text('Status: ${booking.status.name.toUpperCase()}'),
-                    if (booking.notes?.isNotEmpty == true)
-                      Text('Notes: ${booking.notes}'),
+                    Text('Date: ${_formatDate(booking.date)}'),
+                    Text('Time: ${_formatTimeSlot(booking.timeSlot)}'),
+                    Text('Status: ${booking.status.name}'),
                   ],
                 ),
-                trailing: _getStatusIcon(booking.status),
-                isThreeLine: true,
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (booking.status == BookingStatus.approved || booking.status == BookingStatus.pending)
+                      IconButton(
+                        icon: const Icon(Icons.edit),
+                        onPressed: () => _editBooking(context, booking, facility),
+                      ),
+                    if (booking.status == BookingStatus.approved || booking.status == BookingStatus.pending)
+                      IconButton(
+                        icon: const Icon(Icons.cancel),
+                        onPressed: () => _cancelBooking(context, booking.id),
+                      ),
+                  ],
+                ),
               ),
             );
           },
@@ -106,57 +189,87 @@ class FacilitiesScreen extends StatelessWidget {
     );
   }
 
-  IconData _getFacilityIcon(String icon) {
-    switch (icon) {
-      case 'fitness':
-        return Icons.fitness_center;
-      case 'pool':
-        return Icons.pool;
-      case 'hall':
-        return Icons.meeting_room;
-      default:
-        return Icons.sports;
-    }
+  Widget _buildDetailChip(IconData icon, String label) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.grey[200],
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 16),
+          const SizedBox(width: 4),
+          Text(label),
+        ],
+      ),
+    );
   }
 
   String _formatDate(DateTime date) {
     return '${date.day}/${date.month}/${date.year}';
   }
 
-  String _getSlotText(TimeSlot slot) {
-    switch (slot) {
-      case TimeSlot.morning:
-        return 'Morning (6 AM - 12 PM)';
-      case TimeSlot.afternoon:
-        return 'Afternoon (12 PM - 6 PM)';
-      case TimeSlot.evening:
-        return 'Evening (6 PM - 10 PM)';
+  String _formatTimeSlot(TimeSlot slot) {
+    return '${slot.startTime} - ${slot.endTime}';
+  }
+
+  Future<void> _cancelBooking(BuildContext context, String bookingId) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Cancel Booking'),
+        content: const Text('Are you sure you want to cancel this booking?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('No'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Yes'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      try {
+        final provider = Provider.of<FacilityProvider>(context, listen: false);
+        await provider.cancelBooking(bookingId);
+        
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Booking cancelled successfully')),
+          );
+        }
+      } catch (e) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Failed to cancel booking: ${e.toString()}')),
+          );
+        }
+      }
     }
   }
 
-  Widget _getStatusIcon(BookingStatus status) {
-    IconData iconData;
-    Color color;
+  Future<void> _editBooking(BuildContext context, FacilityBooking booking, Facility facility) async {
+    final result = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => FacilityBookingScreen(
+          facility: facility,
+          booking: booking,
+          isEditing: true,
+        ),
+      ),
+    );
 
-    switch (status) {
-      case BookingStatus.pending:
-        iconData = Icons.pending;
-        color = Colors.orange;
-        break;
-      case BookingStatus.approved:
-        iconData = Icons.check_circle;
-        color = Colors.green;
-        break;
-      case BookingStatus.rejected:
-        iconData = Icons.cancel;
-        color = Colors.red;
-        break;
-      case BookingStatus.cancelled:
-        iconData = Icons.block;
-        color = Colors.grey;
-        break;
+    if (result == true && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Booking updated successfully')),
+      );
     }
-
-    return Icon(iconData, color: color);
   }
-} 
+}

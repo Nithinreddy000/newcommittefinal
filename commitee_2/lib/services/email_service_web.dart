@@ -1,17 +1,15 @@
+// ignore: avoid_web_libraries_in_flutter
+import 'dart:js' as js;
 import 'package:flutter/foundation.dart';
+import '../config/email_config.dart';
+import 'email_service_interface.dart';
 
-class EmailService {
-  static final EmailService _instance = EmailService._internal();
+class EmailServiceWeb implements EmailServiceInterface {
   static final String _residentTemplateId = 'template_908etfo';
   static final String _idTemplateId = 'template_63rp7kp';
-  static final String _serviceId = 'service_2rigpdj';
+  static final String _serviceId = EmailConfig.serviceId;
 
-  factory EmailService() {
-    return _instance;
-  }
-
-  EmailService._internal();
-
+  @override
   Future<bool> sendCredentials({
     required String email,
     required String username,
@@ -40,24 +38,28 @@ class EmailService {
 
       final templateId = role == 'resident' ? _residentTemplateId : _idTemplateId;
 
-      // Log the attempt regardless of platform
-      if (kDebugMode) {
-        print('Email parameters:');
-        print('  To: $cleanEmail');
-        print('  Name: $name');
-        print('  Role: $role');
-        print('  Template: $templateId');
-        print('  Username: $username');
-        print('  Password: $password');
-        if (role == 'resident') {
-          print('  Flat Number: $flatNumber');
-        } else {
-          print('  ID Number: $flatNumber');
-        }
-      }
+      if (kIsWeb) {
+        final result = await js.context.callMethod('sendEmail', [
+          _serviceId,
+          templateId,
+          js.JsObject.jsify(templateParams),
+        ]);
 
-      // Return true to simulate success on non-web platforms
-      return true;
+        if (kDebugMode) {
+          print('Email parameters: $templateParams');
+          print('Using template: $templateId for role: $role');
+          print('Email sending result: $result');
+        }
+
+        return true;
+      } else {
+        // For non-web platforms, log the attempt
+        if (kDebugMode) {
+          print('Would send email with parameters: $templateParams');
+          print('Using template: $templateId for role: $role');
+        }
+        return true;
+      }
     } catch (e) {
       if (kDebugMode) {
         print('Error sending email: $e');
@@ -66,14 +68,13 @@ class EmailService {
     }
   }
 
+  @override
   Future<void> sendWelcomeEmail({
     required String toName,
     required String toEmail,
   }) async {
     if (kDebugMode) {
-      print('Would send welcome email to:');
-      print('  Name: $toName');
-      print('  Email: $toEmail');
+      print('Sending welcome email to $toEmail');
     }
   }
 }

@@ -31,7 +31,10 @@ void main() async {
         ChangeNotifierProvider(
           create: (context) => AuthService(context),
         ),
-        ChangeNotifierProvider(create: (_) => MemberProvider()),
+        ChangeNotifierProxyProvider<AuthService, MemberProvider>(
+          create: (context) => MemberProvider(Provider.of<AuthService>(context, listen: false)),
+          update: (context, authService, previous) => previous ?? MemberProvider(authService),
+        ),
         ChangeNotifierProvider(create: (_) => VisitorProvider()),
         ChangeNotifierProvider(create: (_) => AnnouncementProvider()),
         ChangeNotifierProvider(create: (_) => PollProvider()),
@@ -85,4 +88,3 @@ class AuthWrapper extends StatelessWidget {
     );
   }
 }
-

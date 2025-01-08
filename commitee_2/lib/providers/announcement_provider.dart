@@ -29,4 +29,12 @@ class AnnouncementProvider extends ChangeNotifier {
     _announcements.removeWhere((announcement) => announcement.id == id);
     notifyListeners();
   }
+
+  void updateAnnouncement(Announcement updatedAnnouncement) {
+    final index = _announcements.indexWhere((a) => a.id == updatedAnnouncement.id);
+    if (index != -1) {
+      _announcements[index] = updatedAnnouncement;
+      notifyListeners();
+    }
+  }
 } 
