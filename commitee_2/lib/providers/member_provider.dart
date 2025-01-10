@@ -48,21 +48,22 @@ class MemberProvider extends ChangeNotifier {
       _members.add(member);
       notifyListeners();
 
-      // Send welcome email with credentials
-      try {
-        await EmailService().sendCredentials(
-          email: email,
-          username: email,
-          password: password,
-          name: name,
-          flatNumber: role == 'resident' ? (flatNumber ?? '') : (idNumber ?? ''),
-          role: role,
-          contactNumber: contactNumber,
+        // Send welcome email with credentials
+        final emailService = EmailService();
+        final emailSent = await emailService.sendCredentials(
+        email: email,
+        username: email,
+        password: password,
+        name: name,
+        flatNumber: role == 'resident' ? (flatNumber ?? '') : (idNumber ?? ''),
+        role: role,
+        contactNumber: contactNumber,
         );
-      } catch (e) {
-        debugPrint('Failed to send welcome email: $e');
-        // Don't throw the error as the member was still created successfully
-      }
+
+        if (!emailSent) {
+        debugPrint('Failed to send welcome email');
+        // Don't throw error as member was still created successfully
+        }
 
       return (true, password);
     } catch (e) {

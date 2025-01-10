@@ -68,6 +68,9 @@ class NotificationService {
       importance: Importance.high,
       priority: Priority.high,
       showWhen: true,
+      enableLights: true,
+      playSound: true,
+      styleInformation: DefaultStyleInformation(true, true),
     );
 
     const iosDetails = DarwinNotificationDetails();
